@@ -25,16 +25,6 @@ func GetENV(key string) (string, error) {
 	return os.Getenv(key), nil
 }
 
-func ScheduleFunc(f func(), interval time.Duration) *time.Ticker {
-	ticker := time.NewTicker(interval)
-	go func() {
-		for range ticker.C {
-			f()
-		}
-	}()
-	return ticker
-}
-
 func logToFile(message string) {
 	f, err := os.OpenFile("api.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
@@ -58,16 +48,6 @@ func WrapErrorLog(message string) {
 func ReportMessage(message string) {
 	logToFile(message)
 	logToFile("")
-}
-
-func StringToInt(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		// handle error
-		fmt.Println(err)
-		os.Exit(2)
-	}
-	return i
 }
 
 func StringToFloat64(s string) (float64, error) {
@@ -105,6 +85,7 @@ func WrapDaemon(daemon models.Daemon, maxTries int, method string, params ...int
 }
 
 func callDaemon(c chan []byte, e chan error, wg *sync.WaitGroup, daemon *models.Daemon, triesMax int, command string, params any) {
+	defer wg.Done()
 	wg.Add(1)
 	var client *coind.Coind
 	var errClient error
@@ -115,7 +96,6 @@ func callDaemon(c chan []byte, e chan error, wg *sync.WaitGroup, daemon *models.
 		}
 		if tries >= triesMax {
 			e <- errors.New("error getting RPC data")
-			wg.Done()
 			break
 		}
 
@@ -141,7 +121,6 @@ func callDaemon(c chan []byte, e chan error, wg *sync.WaitGroup, daemon *models.
 			if len(p) != 0 {
 				c <- p
 				client = nil
-				wg.Done()
 				break
 			}
 		}

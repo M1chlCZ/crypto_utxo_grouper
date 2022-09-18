@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -68,7 +69,8 @@ outerLoop:
 		res, err := utils.WrapDaemon(dm, 10, "listunspent")
 		if err != nil {
 			utils.WrapErrorLog(err.Error())
-			return
+			time.Sleep(time.Second * 60)
+			continue
 		}
 		var ing models.ListUnspent
 		errJson := json.Unmarshal(res, &ing)
@@ -76,6 +78,9 @@ outerLoop:
 			utils.WrapErrorLog(errJson.Error())
 			return
 		}
+		sort.Slice(ing, func(i, j int) bool {
+			return ing[i].Amount < ing[j].Amount
+		})
 	innerLoop:
 		for _, unspent := range ing {
 			if numberOfInputs == 25 || amount > groupAmount {
@@ -86,7 +91,7 @@ outerLoop:
 				numberOfInputs++
 			}
 		}
-		if numberOfInputs == 0 {
+		if numberOfInputs <= 1 {
 			break outerLoop
 		}
 		utils.ReportMessage(fmt.Sprintf("Amount %f, %d UTXO, deposit addr %s", amount, numberOfInputs, address))
@@ -102,6 +107,13 @@ outerLoop:
 	}
 
 	utils.ReportMessage("GroupTX done")
+	waitUntilReady()
+}
+
+func waitUntilReady() {
+	utils.ReportMessage("Waiting hour to get another UTXO to group")
+	time.Sleep(time.Hour * 1)
+	groupTX()
 }
 
 func getStakingDaemon() (models.Daemon, error) {

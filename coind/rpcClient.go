@@ -2,6 +2,7 @@ package coind
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -68,10 +69,10 @@ func newClient(host string, port int, user, passwd string, useSSL bool, timeout 
 		t := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		httpClient = &http.Client{Transport: t}
+		httpClient = &http.Client{Transport: t, Timeout: time.Duration(timeout) * time.Second}
 	} else {
 		serverAddr = "http://"
-		httpClient = &http.Client{}
+		httpClient = &http.Client{Timeout: time.Duration(timeout) * time.Second}
 	}
 	c = &rpcClient{serverAddr: fmt.Sprintf("%s%s:%d", serverAddr, host, port), user: user, passwd: passwd, httpClient: httpClient, timeout: timeout}
 	return
@@ -99,7 +100,10 @@ func (c *rpcClient) doTimeoutRequest(timer *time.Timer, req *http.Request) (*htt
 
 // call prepare & exec the request
 func (c *rpcClient) call(method string, params any) (rr rpcResponse, err error) {
-	connectTimer := time.NewTimer(time.Duration(c.timeout) * time.Second)
+	//connectTimer := time.NewTimer(time.Duration(c.timeout) * time.Second)
+	ctx, cncl := context.WithTimeout(context.Background(), time.Duration(c.timeout)*time.Second)
+	defer cncl()
+
 	rpcR := rpcRequest{method, params, time.Now().UnixNano(), "2.0"}
 	payloadBuffer := &bytes.Buffer{}
 	jsonEncoder := json.NewEncoder(payloadBuffer)
@@ -107,20 +111,19 @@ func (c *rpcClient) call(method string, params any) (rr rpcResponse, err error) 
 	if err != nil {
 		return
 	}
-	req, err := http.NewRequest("POST", c.serverAddr, payloadBuffer)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.serverAddr, payloadBuffer)
 	if err != nil {
 		return
 	}
 	req.Header.Add("Content-Type", "application/json;charset=utf-8")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Set("Connection", "close")
 
 	// Auth ?
 	if len(c.user) > 0 || len(c.passwd) > 0 {
 		req.SetBasicAuth(c.user, c.passwd)
 	}
 
-	resp, err := c.doTimeoutRequest(connectTimer, req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		_ = req.Body.Close()
 		return
