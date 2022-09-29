@@ -94,15 +94,15 @@ func (c *rpcClient) doTimeoutRequest(timer *time.Timer, req *http.Request) (*htt
 	case r := <-done:
 		return r.resp, r.err
 	case <-timer.C:
-		return nil, errors.New("Timeout reading data from server")
+		return nil, errors.New("timeout reading data from server")
 	}
 }
 
 // call prepare & exec the request
 func (c *rpcClient) call(method string, params any) (rr rpcResponse, err error) {
 	//connectTimer := time.NewTimer(time.Duration(c.timeout) * time.Second)
-	ctx, cncl := context.WithTimeout(context.Background(), time.Duration(c.timeout)*time.Second)
-	defer cncl()
+	ctx, cnc := context.WithTimeout(context.Background(), time.Duration(c.timeout)*time.Second)
+	defer cnc()
 
 	rpcR := rpcRequest{method, params, time.Now().UnixNano(), "2.0"}
 	payloadBuffer := &bytes.Buffer{}

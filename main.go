@@ -83,7 +83,7 @@ outerLoop:
 		})
 	innerLoop:
 		for _, unspent := range ing {
-			if numberOfInputs == 25 || amount > groupAmount {
+			if numberOfInputs == 50 || amount > groupAmount {
 				break innerLoop
 			}
 			if unspent.Spendable && (unspent.Amount+amount) < groupAmount {
