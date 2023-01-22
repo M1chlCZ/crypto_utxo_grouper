@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -66,7 +65,7 @@ outerLoop:
 	for {
 		amount := 0.0
 		numberOfInputs := 0
-		res, err := utils.WrapDaemon(dm, 10, "listunspent")
+		res, err := coind.WrapDaemon(dm, 1, "listunspent")
 		if err != nil {
 			utils.WrapErrorLog(err.Error())
 			time.Sleep(time.Second * 60)
@@ -163,14 +162,8 @@ func getStakingDaemon() (models.Daemon, error) {
 }
 
 func sendCoins(request models.UnstakeClientReq, daemon models.Daemon) (string, error) {
-	client, errClient := coind.New("127.0.0.1", daemon.WalletPort, daemon.WalletUser, daemon.WalletPass, false, 30)
-	if errClient != nil {
-		log.Println(errClient.Error())
-		//utils.ReportError(w, "Wallet coin id is unreachable", http.StatusInternalServerError)
-		return "", errClient
-	}
 	if daemon.PassPhrase.Valid {
-		_, erUnlock := client.Call("walletpassphrase", daemon.PassPhrase.String, 1000)
+		_, erUnlock := coind.WrapDaemon(daemon, 1, "walletpassphrase", daemon.PassPhrase.String, 1000)
 		if erUnlock != nil {
 			utils.WrapErrorLog("error unlock" + erUnlock.Error())
 			return "", erUnlock
@@ -179,36 +172,33 @@ func sendCoins(request models.UnstakeClientReq, daemon models.Daemon) (string, e
 	}
 
 	utils.ReportMessage(fmt.Sprintf("Amount %f, deposit addr %s", request.Amount, request.Deposit))
-	txid, er := client.Call("sendtoaddress", request.Deposit, request.Amount)
+	txid, er := coind.WrapDaemon(daemon, 2, "sendtoaddress", request.Deposit, request.Amount)
 	if er != nil {
-		log.Println(er.Error())
+		utils.WrapErrorLog(er.Error())
 		//utils.ReportError(w, er.Error(), http.StatusInternalServerError)
 		return "", er
 	}
 	if string(txid) == "null" {
-		//utils.ReportError(w, utils.TrimQuotes(string(txid)), http.StatusConflict)
+		utils.WrapErrorLog("tx bullshit")
 		return "", errors.New("null")
 	}
 	time.Sleep(500 * time.Millisecond)
 	if daemon.PassPhrase.Valid {
-		_, erLock := client.Call("walletlock")
+		_, erLock := coind.WrapDaemon(daemon, 1, "walletlock")
 		if erLock != nil {
 			utils.WrapErrorLog(erLock.Error())
-			log.Println("error unlock" + erLock.Error())
 			//utils.ReportError(w, "Wallet coin id is unreachable", http.StatusInternalServerError)
 			return "", erLock
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	if daemon.PassPhrase.Valid {
-		_, erLock := client.Call("walletpassphrase", daemon.PassPhrase.String, 999999999, true)
+		_, erLock := coind.WrapDaemon(daemon, 1, "walletpassphrase", daemon.PassPhrase.String, 999999999, true)
 		if erLock != nil {
 			utils.WrapErrorLog(erLock.Error())
-			log.Println("error unlock" + erLock.Error())
 			//utils.ReportError(w, "Wallet coin id is unreachable", http.StatusInternalServerError)
 			return "", erLock
 		}
 	}
-	client = nil
 	return string(txid), nil
 }
