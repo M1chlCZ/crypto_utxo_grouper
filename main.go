@@ -82,6 +82,10 @@ outerLoop:
 		})
 	innerLoop:
 		for _, unspent := range ing {
+			if unspent.Address == address {
+				utils.ReportMessage("Same address")
+				continue
+			}
 			if numberOfInputs == 50 || amount > groupAmount {
 				break innerLoop
 			}
