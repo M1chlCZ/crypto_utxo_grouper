@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	a, err := utils.GetENV("GROUP_ADDRESS")
+	var a, err = utils.GetENV("GROUP_ADDRESS")
 	if err != nil || len(a) == 0 {
 		utils.WrapErrorLog("Could not get GROUP_ADDRESS in env file")
 		return
@@ -50,6 +50,7 @@ func groupTX() {
 		utils.WrapErrorLog(err.Error())
 		return
 	}
+	avoid, _ := utils.GetENV("SAME_ADDRESS_AVOID")
 
 	address, _ := utils.GetENV("GROUP_ADDRESS")
 	ga, _ := utils.GetENV("GROUP_AMOUNT")
@@ -82,11 +83,13 @@ outerLoop:
 		})
 	innerLoop:
 		for _, unspent := range ing {
-			if unspent.Address == address {
-				utils.ReportMessage("Same address")
-				continue
+			if avoid == "true" {
+				if unspent.Address == address {
+					utils.ReportMessage("Same address")
+					continue
+				}
 			}
-			if numberOfInputs == 50 || amount > groupAmount {
+			if numberOfInputs == 1000 || amount > groupAmount {
 				break innerLoop
 			}
 			if unspent.Spendable && (unspent.Amount+amount) < groupAmount {
