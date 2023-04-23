@@ -39,6 +39,11 @@ func main() {
 		utils.WrapErrorLog("Could not get WALLET_PORT in env file")
 		return
 	}
+	_, err = utils.GetENV("MAX_UTXO")
+	if err != nil {
+		utils.WrapErrorLog("Could not get MAX_UTXO in env file")
+		return
+	}
 
 	groupTX()
 }
@@ -54,6 +59,11 @@ func groupTX() {
 
 	address, _ := utils.GetENV("GROUP_ADDRESS")
 	ga, _ := utils.GetENV("GROUP_AMOUNT")
+	mutxo, _ := utils.GetENV("MAX_UTXO")
+	maxUtxo, err := strconv.Atoi(mutxo)
+	if err != nil {
+		maxUtxo = 100
+	}
 	groupAmount, errNum := utils.StringToFloat64(ga)
 	if errNum != nil {
 		utils.WrapErrorLog("GROUP_AMOUNT is not a float, needs to be in format: 10.0")
@@ -89,7 +99,7 @@ outerLoop:
 					continue
 				}
 			}
-			if numberOfInputs == 1000 || amount > groupAmount {
+			if numberOfInputs == maxUtxo || amount > groupAmount {
 				break innerLoop
 			}
 			if unspent.Spendable && (unspent.Amount+amount) < groupAmount {
